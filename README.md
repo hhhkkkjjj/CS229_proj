@@ -6,4 +6,4 @@ pip install pandas
 pip install scikit-learn
 pip install seaborn
 ```
-Download dataset via https://www.kaggle.com/wkirgsn/electric-motor-temperature and put in src folder.
+Download dataset via https://www.kaggle.com/wkirgsn/electric-motor-temperature and put it in src folder.
