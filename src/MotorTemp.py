@@ -36,5 +36,5 @@ class MLProj:
 
 if __name__ == "__main__":
     P = MLProj()
-    P.ProfilePlot(plot=True)
-    P.CorrPlot(plot=True)
+    P.ProfilePlot(plot=False)
+    P.CorrPlot(plot=False)
