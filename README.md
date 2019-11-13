@@ -7,3 +7,7 @@ pip install scikit-learn
 pip install seaborn
 ```
 Download dataset via https://www.kaggle.com/wkirgsn/electric-motor-temperature and put it in src folder.
+
+Update:
+11/12/2019 Xueying
+print out the highest score of linear regression among labels
