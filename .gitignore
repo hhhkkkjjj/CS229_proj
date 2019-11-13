@@ -1,3 +1,3 @@
 .idea/*
 src/__pycache__/*
-*.csv
+src/pmsm_temperature_data.csv
