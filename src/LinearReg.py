@@ -1,23 +1,36 @@
 import numpy as np
-import pandas as pd
-import os
-import seaborn as sns
 import util
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 
+def main(profile, input_col, label_col, cross, profile_test):
+    """
+    :param profile: read profile_id, int type
+    :param input_col: list of X name
+    :param label_col: list of y name
+    :param cross: whether it is a cross test between two profiles
+    :param profile_test: the test profile if cross == True
+    :return: n/a
+    """
+    path = 'profile_data/Profile_' + str(profile) + '.csv'
+    if not cross:
+        x, y = util.load_dataset(path, input_col, label_col)
+        x_train, x_test, y_train, y_test = train_test_split(
+            x, y, test_size=0.3, random_state=5)
+    else:
+        x_train, y_train = util.load_dataset(path, input_col, label_col)
 
-def main(path, input_col, label_col, data_start, data_end):
-    """
-    Args:
-        train_path: Path to CSV file containing dataset for training.
-    """
-    x, y = util.load_dataset(path, input_col, label_col)
-    x_train, x_test, y_train, y_test = train_test_split(
-        x[data_start: data_end], y[data_start: data_end], test_size=0.33, random_state=0)
-    n_label = len(label_col)
-    n_input = len(input_col)
+    n_label = len(label_col) # number of kinds of labels
+    n_input = len(input_col) # number of kinds of outputs
+
+    # initialization for theta
     theta = np.zeros((n_label, n_input + 1))
+
+    if cross:
+        # test path
+        path = 'profile_data/Profile_' + str(profile_test) + '.csv'
+        x_test, y_test = util.load_dataset(path, input_col, label_col)
+
     for i in range(n_label):
         reg = LinearRegression().fit(x_train, y_train[:, i])
         theta[i, 0] = reg.intercept_
@@ -27,10 +40,11 @@ def main(path, input_col, label_col, data_start, data_end):
         print('Multiple Linear Regression Score : ',
               reg.score(x_test, y_test[:, i]))
 
+    # if only one input, we can plot it
     if n_input == 1:
         for i in range(n_label):
             save_path = "plots/" + \
-                input_col[0] + '_vs_' + label_col[i] + '.png'
+                        input_col[0] + '_vs_' + label_col[i] + '.png'
             util.plot(x_test, y_test[:, i], theta[i, :],
                       input_col[0], label_col[0], save_path)
     print("theta is: ")
@@ -40,8 +54,9 @@ def main(path, input_col, label_col, data_start, data_end):
 if __name__ == '__main__':
     input_col = [ "coolant", "ambient", "i_d", "u_d","motor_speed"]
     label_col = ["pm","stator_yoke", "stator_tooth", "stator_winding"]
-    main(path='pmsm_temperature_data.csv',
-         input_col=input_col,
-         label_col=label_col,
-         data_start=0,
-         data_end=1000)
+    path = 'profile_data/Profile_4.csv'
+    main(profile=4,
+        input_col=input_col,
+        label_col=label_col,
+        cross = False,  # cross test: True
+        profile_test=6) # if cross test, profile used for test
