@@ -31,14 +31,22 @@ def main(profile, input_col, label_col, cross, profile_test):
         path = 'profile_data/Profile_' + str(profile_test) + '.csv'
         x_test, y_test = util.load_dataset(path, input_col, label_col)
 
+    high_score=0
     for i in range(n_label):
+        print('For label',label_col[i]," : ")
         reg = LinearRegression().fit(x_train, y_train[:, i])
         theta[i, 0] = reg.intercept_
-        print(reg.coef_)
+        # print(reg.coef_)
         theta[i, 1:] = reg.coef_
 
-        print('Multiple Linear Regression Score : ',
+        score=reg.score(x_test, y_test[:, i])
+        if score>high_score:
+            high_score=score
+            label=label_col[i]
+
+        print('Multiple Linear Regression Score for',label,'is',
               reg.score(x_test, y_test[:, i]))
+    print('In profile', profile, 'the highest score for',label,'is',high_score)
 
     # if only one input, we can plot it
     if n_input == 1:
