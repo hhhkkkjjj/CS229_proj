@@ -11,3 +11,5 @@ Download dataset via https://www.kaggle.com/wkirgsn/electric-motor-temperature a
 Update:
 11/12/2019 Xueying
 print out the highest score of linear regression among labels
+
+Add feature i, u, Power only in Profile_4.csv
