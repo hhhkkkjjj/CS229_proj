@@ -67,7 +67,7 @@ def main(profile, input_col, label_col, cross, profile_test):
 
 
 if __name__ == '__main__':
-    input_col = ["coolant", "i_d", "i_q", "u_d", "u_q", "i", "u", "Power"]
+    input_col = ["coolant", "i_d", "i_q", "u_d", "u_q"]
     label_col = ["pm","stator_yoke", "stator_tooth", "stator_winding"]
     path = 'profile_data/Profile_4.csv'
     main(profile=4,
