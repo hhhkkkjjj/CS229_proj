@@ -2,6 +2,7 @@ import numpy as np
 import util
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+import pandas as pd
 
 def main(profile, input_col, label_col, cross, profile_test):
     """
@@ -43,7 +44,13 @@ def main(profile, input_col, label_col, cross, profile_test):
         if score>high_score:
             high_score=score
             label=label_col[i]
-
+        x_new = util.add_intercept(x_test)
+        pred = x_new.dot(theta[i, :])
+        den = pd.DataFrame({'Actual': y_test[:, i],
+                            'Prediction': pred, })
+        p = den.plot.kde()
+        fig = p.get_figure()
+        fig.savefig("density_plot/" + label + '_density.png')
         print('Multiple Linear Regression Score for',label,'is',
               reg.score(x_test, y_test[:, i]))
     print('In profile', profile, 'the highest score for',label,'is',high_score)
@@ -60,7 +67,7 @@ def main(profile, input_col, label_col, cross, profile_test):
 
 
 if __name__ == '__main__':
-    input_col = [ "coolant", "ambient", "i_d", "u_d","motor_speed"]
+    input_col = ["coolant", "i_d", "i_q", "u_d", "u_q", "i", "u", "Power"]
     label_col = ["pm","stator_yoke", "stator_tooth", "stator_winding"]
     path = 'profile_data/Profile_4.csv'
     main(profile=4,
