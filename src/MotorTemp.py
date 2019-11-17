@@ -25,10 +25,11 @@ class MLProj:
     def CorrPlot(self, filename="plots/CorrPlot.png", plot=True):
         #Correlation Map#
         corrmat = self.dataset.corr()
-        fig = plt.figure(figsize=(12, 12))
+        fig = plt.figure(figsize=(15, 8))
         cmap = sns.diverging_palette(240, 10, as_cmap=True)
         sns.heatmap(corrmat, annot=True, linewidths=.5, fmt='.2f', mask=np.zeros_like(
-            corrmat, dtype=np.bool), cmap=cmap, square=True)
+            corrmat, dtype=np.bool), cmap=cmap, square=False)
+        plt.tight_layout()
         fig.savefig(filename)
         if plot:
             plt.show()
@@ -36,5 +37,5 @@ class MLProj:
 
 if __name__ == "__main__":
     P = MLProj()
-    P.ProfilePlot(plot=False)
-    P.CorrPlot(plot=False)
+    # P.ProfilePlot(plot=False)
+    P.CorrPlot(plot=True)
