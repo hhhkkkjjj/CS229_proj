@@ -1,8 +1,11 @@
 import numpy as np
 import util
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import RANSACRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_squared_error
 import pandas as pd
 
 def main(profile, input_col, label_col, ransac, cross, profile_test):
@@ -35,7 +38,8 @@ def main(profile, input_col, label_col, ransac, cross, profile_test):
 
     high_score=0
     for i in range(n_label):
-        print('For label',label_col[i]," : ")
+        print('For label', label_col[i], " : ")
+        kNeighbor(x_train, y_train[:, i], x_test, y_test[:, i])
         if not ransac:
             reg = LinearRegression().fit(x_train, y_train[:, i])
             theta[i, 0] = reg.intercept_
@@ -45,7 +49,9 @@ def main(profile, input_col, label_col, ransac, cross, profile_test):
             theta[i, 0] = reg.estimator_.intercept_
             theta[i, 1:] = reg.estimator_.coef_
 
-        score = reg.score(x_test, y_test[:, i])
+        # score = reg.score(x_train, y_train[:, i])
+        scores = cross_val_score(reg, x_test, y_test[:, i], cv=5, scoring='neg_mean_squared_error')
+        score = -scores.mean()
         if score > high_score:
             high_score = score
             label = label_col[i]
@@ -56,8 +62,8 @@ def main(profile, input_col, label_col, ransac, cross, profile_test):
         p = den.plot.kde()
         fig = p.get_figure()
         fig.savefig("density_plot/" + label_col[i] + '_density.png')
-        print('Multiple Linear Regression Score for', label_col[i], 'is',
-              reg.score(x_test, y_test[:, i]))
+        print('Multiple Linear Regression MSE for', label_col[i], 'is',
+              score, '+-', scores.std()*2)
     print('In profile', profile, 'the highest score for', label, 'is',high_score)
 
     # if only one input, we can plot it
@@ -70,14 +76,27 @@ def main(profile, input_col, label_col, ransac, cross, profile_test):
     print("theta is: ")
     print(theta)
 
+def kNeighbor(X_train, Y_train, X_test, Y_test):
+    from sklearn.neighbors import KNeighborsRegressor
+    import math
+    rmse_val = []  # to store rmse values for different k
+    for K in range(20):
+        K = K + 1
+        model = KNeighborsRegressor(n_neighbors=K)
+
+        model.fit(X_train, Y_train)  # fit the model
+        pred = model.predict(X_test)  # make prediction on test set
+        error = math.sqrt(mean_squared_error(Y_test, pred))  # calculate rmse
+        rmse_val.append(error)  # store rmse values
+        print('RMSE value for k= ', K, 'is:', error)
 
 if __name__ == '__main__':
-    input_col = ["ambient", "coolant", "motor_speed", "i_d", "i_q", "u_d", "u_q", "i", "u", "Power"]
-    label_col = ["pm","stator_yoke", "stator_tooth", "stator_winding"]
+    input_col = ["ambient", "coolant", "motor_speed", "i_d", "i", "u"]
+    label_col = ["pm", "stator_yoke", "stator_tooth", "stator_winding"]
     path = 'profile_data/Profile_4.csv'
     main(profile=4,
         input_col=input_col,
         label_col=label_col,
-        ransac=True,
+        ransac=False,
         cross = False,  # cross test: True
         profile_test=6) # if cross test, profile used for test
