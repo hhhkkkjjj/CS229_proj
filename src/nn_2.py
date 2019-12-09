@@ -19,7 +19,6 @@ import torch.utils.data
 from sklearn.preprocessing import MinMaxScaler
 
 class PMSMDataset(torch.utils.data.dataset.Dataset):
-    """Dataset with Rotor Temperature as Target"""
     def __init__(self, data, target):
 
         self.data = data
@@ -33,6 +32,7 @@ class PMSMDataset(torch.utils.data.dataset.Dataset):
 
 class Network(nn.Module):
     def __init__(self, sequence_length, n_features):
+        ## Two layers of neural network
         super(Network, self).__init__()
 
         self.conv1 = nn.Conv1d(1, 5, kernel_size=(sequence_length, n_features))
@@ -53,9 +53,8 @@ class Network(nn.Module):
         return x
 
 def convert_sequences(features_df, target_df, sequence_length):
-    """Builds sequences from data and converts them into pytorch tensors
-        sequence_length - represents the number of samples to be considered in a sequence
-    """
+    ## divide data into time sequences and only predict result after the time sequence
+    ## reasonable sequence length should be greater than 2
     input_list = []
     output_list = []
 
@@ -73,25 +72,25 @@ def convert_sequences(features_df, target_df, sequence_length):
     return data, target
 
 def divideData(path,prof_id):
-    df = pd.read_csv(path)
-    df['profile_id'] = df.profile_id.astype('category', inplace=True)
-    df_dict = {}
-    for id_ in df.profile_id.unique():
-        df_dict[id_] = df[df['profile_id']==id_].reset_index(drop = True)
-    return df_dict[prof_id]
+    data= pd.read_csv(path)
+    data['profile_id'] = data.profile_id.astype('category', inplace=True)
+    dict = {}
+    for id in data.profile_id.unique():
+        dict[id] = data[data['profile_id']==id].reset_index(drop = True)
+    return dict[prof_id]
 
 def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,test=True):
     n_features = len(feature_list)
-    curr_df = divideData(path,prof_id)
+    curr_data = divideData(path,prof_id)
 
-    curr_df = curr_df.drop('profile_id', axis = 1)
-    columns = curr_df.columns.tolist()
+    curr_data = curr_data.drop('profile_id', axis = 1)
+    columns = curr_data.columns.tolist()
 
     scaler = MinMaxScaler()
-    curr_df = pd.DataFrame(scaler.fit_transform(curr_df), columns=columns)
+    curr_data = pd.DataFrame(scaler.fit_transform(curr_data), columns=columns)
 
-    features = curr_df[feature_list]
-    target = curr_df[target_list][['pm']]       ##pm is what we care about the most
+    features = curr_data[feature_list]
+    target = curr_data[target_list][['pm']]       ##pm is what we care about the most
 
     data, target = convert_sequences(features, target, sequence_length)
 
@@ -115,14 +114,12 @@ def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,
 
 
     net = Network(sequence_length, n_features).double()
-
-
     criterion = nn.MSELoss()
     optimizer = optim.Adam(net.parameters(), lr)
-
+## training network
     training_losses = []
     delta=0.0
-    threshold=0.001
+    threshold=1e-6
     prev_loss=0
     for epoch in range(50):
         running_loss = 0.0
@@ -137,13 +134,15 @@ def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,
             train_loss.backward()
             optimizer.step()
         training_losses.append(np.mean(batch_losses))
-        delta=training_losses[-1]-prev_loss
+        delta=abs(training_losses[-1]-prev_loss)
+        # print(delta)
         if delta<threshold:
             break
         prev_loss=training_losses[-1]
-        # print("Epoch {}, loss {:.6f}".format(epoch+1, training_losses[-1]))
+        print("Epoch {}, loss {:.6f}".format(epoch+1, training_losses[-1]))
     plot_fig(training_losses)
 
+ ## testing
     if test:
         losses = []
         batch_losses = []
@@ -181,7 +180,7 @@ if __name__ == '__main__':
     target_list = ['pm', 'torque', 'stator_yoke', 'stator_tooth', 'stator_winding']
     path = "pmsm_temperature_data.csv"
     profile_id = 4
-    sequence_length =6
+    sequence_length = 6
     batch_size = 5
     lr = 0.002
     main(path, profile_id, target_list, feature_list,sequence_length,batch_size,lr,test=True) # if cross test, profile used for test
