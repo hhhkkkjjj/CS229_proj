@@ -35,15 +35,12 @@ class Network(nn.Module):
     def __init__(self, sequence_length, n_features):
         super(Network, self).__init__()
 
-
-        self.conv1 = nn.Conv1d(1, 3, kernel_size=(sequence_length, n_features))
+        self.conv1 = nn.Conv1d(1, 5, kernel_size=(sequence_length, n_features))
 
         self.lin_in_size = self.conv1.out_channels * int(((sequence_length - (self.conv1.kernel_size[0]-1) -1)/self.conv1.stride[0] +1))
 
-#         print(self.lin_in_size)
-
-        self.fc1 = nn.Linear(self.lin_in_size,30)
-        self.fc2 = nn.Linear(30, 1)
+        self.fc1 = nn.Linear(self.lin_in_size,100)
+        self.fc2 = nn.Linear(100, 1)
 
     def forward(self, x):
 
@@ -55,111 +52,136 @@ class Network(nn.Module):
 
         return x
 
-def build_sequences(features_df, target_df, sequence_length = 10):
+def convert_sequences(features_df, target_df, sequence_length):
     """Builds sequences from data and converts them into pytorch tensors
         sequence_length - represents the number of samples to be considered in a sequence
     """
-    data_ = []
-    target_ = []
+    input_list = []
+    output_list = []
 
     for i in range(int(features_df.shape[0]/sequence_length)):
 
-        data = torch.from_numpy(features_df.iloc[i:i+sequence_length].values)
-        #data=torch.from_numpy(features_df[i:i+sequence_length])
-        target = torch.from_numpy(target_df.iloc[i+sequence_length+1].values)
-        #target=torch.from_numpy(target_df[i+sequence_length+1])
+        input = torch.from_numpy(features_df.iloc[i:i+sequence_length].values)
+        output= torch.from_numpy(target_df.iloc[i+sequence_length+1].values)
 
-        data_.append(data)
-        target_.append(target)
+        input_list.append(input)
+        output_list.append(output)
 
-    data = torch.stack(data_)
-    target = torch.stack(target_)
+    data = torch.stack(input_list)
+    target = torch.stack(output_list)
 
     return data, target
 
-def main():
-    df = pd.read_csv("pmsm_temperature_data.csv")
-    col_list = df.columns.tolist()
-    profile_id = ['profile_id']
-    target_list = ['pm', 'torque', 'stator_yoke', 'stator_tooth', 'stator_winding']
-    feature_list = [col for col in col_list if col not in target_list and col not in profile_id]
-
-    col_list = df.columns.tolist()
-    profile_id = ['profile_id']
-    target_list = ['pm', 'torque', 'stator_yoke', 'stator_tooth', 'stator_winding']
-    feature_list = [col for col in col_list if col not in target_list and col not in profile_id]
-
+def divideData(path,prof_id):
+    df = pd.read_csv(path)
     df['profile_id'] = df.profile_id.astype('category', inplace=True)
     df_dict = {}
     for id_ in df.profile_id.unique():
         df_dict[id_] = df[df['profile_id']==id_].reset_index(drop = True)
+    return df_dict[prof_id]
 
-    prof_id = 4
-
-    curr_df = df_dict[prof_id]
+def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,test=True):
+    n_features = len(feature_list)
+    curr_df = divideData(path,prof_id)
 
     curr_df = curr_df.drop('profile_id', axis = 1)
     columns = curr_df.columns.tolist()
 
     scaler = MinMaxScaler()
-
-    curr_df = pd.DataFrame(scaler.fit_transform(curr_df), columns= columns)
-    sequence_length = 3
+    curr_df = pd.DataFrame(scaler.fit_transform(curr_df), columns=columns)
 
     features = curr_df[feature_list]
-    target = curr_df[target_list][['pm']]
+    target = curr_df[target_list][['pm']]       ##pm is what we care about the most
 
-    data, target = build_sequences(features, target, sequence_length=sequence_length)
+    data, target = convert_sequences(features, target, sequence_length)
 
-    test_size = 0.05
+    ##dividing into test and training set
+    test_size = 0.08
 
     indices = torch.randperm(data.shape[0])
 
     train_indices = indices[:int(indices.shape[0] * (1-test_size))]
     test_indices = indices[int(indices.shape[0] * (1-test_size)):]
 
-    X_train, y_train = data[train_indices], target[train_indices]
-    X_test, y_test = data[test_indices], target[test_indices]
+    x_train, y_train = data[train_indices], target[train_indices]
+    x_test, y_test = data[test_indices], target[test_indices]
 
-    batch_size = 10
 
-    pm_train_dataset = PMSMDataset(X_train, y_train)
+    pm_train_dataset = PMSMDataset(x_train, y_train)
     pm_train_loader = torch.utils.data.dataloader.DataLoader(pm_train_dataset, batch_size= batch_size)
 
-    pm_test_dataset = PMSMDataset(X_test, y_test)
+    pm_test_dataset = PMSMDataset(x_test, y_test)
     pm_test_loader = torch.utils.data.dataloader.DataLoader(pm_test_dataset, batch_size= 1)
 
-    n_features = X_train.shape[-1]
 
     net = Network(sequence_length, n_features).double()
 
-    lr = 0.001
 
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(net.parameters(), lr=lr)
+    optimizer = optim.Adam(net.parameters(), lr)
 
     training_losses = []
+    delta=0.0
+    threshold=0.001
+    prev_loss=0
     for epoch in range(50):
         running_loss = 0.0
         batch_losses = []
         for i, (data, target) in enumerate(pm_train_loader):
-
             optimizer.zero_grad()
+            predicted = net(data)
 
-            out = net(data)
+            train_loss = criterion(predicted, target)
+            batch_losses.append(train_loss.item())
 
-            loss = criterion(out, target)
-            batch_losses.append(loss.item())
-
-            loss.backward()
+            train_loss.backward()
             optimizer.step()
         training_losses.append(np.mean(batch_losses))
-        print("Epoch {}, loss {:.6f}".format(epoch+1, training_losses[-1]))
+        delta=training_losses[-1]-prev_loss
+        if delta<threshold:
+            break
+        prev_loss=training_losses[-1]
+        # print("Epoch {}, loss {:.6f}".format(epoch+1, training_losses[-1]))
+    plot_fig(training_losses)
 
+    if test:
+        losses = []
+        batch_losses = []
+        labels = []
+        outputs = []
+        with torch.no_grad():
+            for i, (data, target) in enumerate(pm_test_loader):
+                output = net(data)
+                loss = criterion(output, target)
+
+                labels.append(target.item())
+                outputs.append(output.item())
+
+                batch_losses.append(loss.item())
+            losses.append(np.mean(batch_losses))
+        print("Testing loss {:.6f}".format(losses[-1]))
+        plot_fig_test(outputs,labels)
+
+def plot_fig(training_losses):
+    plt.plot(training_losses)
+    plt.xlabel('Iterations')
+    plt.ylabel('MSE Loss')
+    plt.savefig('training_loss_lr_'+str(lr)+'_sequence_length'+str(sequence_length)+' .png')
+
+def plot_fig_test(outputs,labels):
+    plt.figure(figsize=(13,7))
+    plt.plot(np.arange(len(outputs)),outputs, alpha = 0.8, marker = '.',label = 'predicted' )
+    plt.scatter(np.arange(len(labels)),labels, c = 'r', s = 15, label = 'labels')
+    plt.legend(loc='best')
+    plt.savefig('Testing_result_lr_'+str(lr)+'_sequence_length'+str(sequence_length)+' .png')
 
 if __name__ == '__main__':
     # input_col = ["ambient", "coolant", "motor_speed", "i_d", "i", "u","Time"]
-    input_col = ["ambient", "coolant", "i", "u","Time"]
-    label_col = ["pm", "stator_yoke", "stator_tooth", "stator_winding"]
-    path = 'profile_data/Profile_4.csv'
-    main() # if cross test, profile used for test
+    feature_list = ["ambient", "coolant","motor_speed", "i", "u",]
+    target_list = ['pm', 'torque', 'stator_yoke', 'stator_tooth', 'stator_winding']
+    path = "pmsm_temperature_data.csv"
+    profile_id = 4
+    sequence_length =6
+    batch_size = 5
+    lr = 0.002
+    main(path, profile_id, target_list, feature_list,sequence_length,batch_size,lr,test=True) # if cross test, profile used for test
