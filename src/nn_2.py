@@ -39,8 +39,8 @@ class Network(nn.Module):
 
         self.lin_in_size = self.conv1.out_channels * int(((sequence_length - (self.conv1.kernel_size[0]-1) -1)/self.conv1.stride[0] +1))
 
-        self.fc1 = nn.Linear(self.lin_in_size,100)
-        self.fc2 = nn.Linear(100, 1)
+        self.fc1 = nn.Linear(self.lin_in_size,300)
+        self.fc2 = nn.Linear(300, 1)
 
     def forward(self, x):
 
@@ -79,7 +79,7 @@ def divideData(path,prof_id):
         dict[id] = data[data['profile_id']==id].reset_index(drop = True)
     return dict[prof_id]
 
-def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,test=True):
+def main(path, prof_id, target_list, feature_list,output, sequence_length,batch_size,lr,test=True):
     n_features = len(feature_list)
     curr_data = divideData(path,prof_id)
 
@@ -90,7 +90,7 @@ def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,
     curr_data = pd.DataFrame(scaler.fit_transform(curr_data), columns=columns)
 
     features = curr_data[feature_list]
-    target = curr_data[target_list][['pm']]       ##pm is what we care about the most
+    target = curr_data[target_list][output]       ##pm is what we care about the most
 
     data, target = convert_sequences(features, target, sequence_length)
 
@@ -112,23 +112,23 @@ def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,
     pm_test_dataset = PMSMDataset(x_test, y_test)
     pm_test_loader = torch.utils.data.dataloader.DataLoader(pm_test_dataset, batch_size= 1)
 
-
+##setup neural network
     net = Network(sequence_length, n_features).double()
-    criterion = nn.MSELoss()
+    loss_calc = nn.MSELoss()
     optimizer = optim.Adam(net.parameters(), lr)
 ## training network
     training_losses = []
     delta=0.0
     threshold=1e-6
     prev_loss=0
-    for epoch in range(50):
+    for epoch in range(30):
         running_loss = 0.0
         batch_losses = []
         for i, (data, target) in enumerate(pm_train_loader):
             optimizer.zero_grad()
             predicted = net(data)
 
-            train_loss = criterion(predicted, target)
+            train_loss = loss_calc(predicted, target)
             batch_losses.append(train_loss.item())
 
             train_loss.backward()
@@ -151,14 +151,14 @@ def main(path, prof_id, target_list, feature_list,sequence_length,batch_size,lr,
         with torch.no_grad():
             for i, (data, target) in enumerate(pm_test_loader):
                 output = net(data)
-                loss = criterion(output, target)
+                loss = loss_calc(output, target)
 
                 labels.append(target.item())
                 outputs.append(output.item())
 
                 batch_losses.append(loss.item())
             losses.append(np.mean(batch_losses))
-        print("Testing loss {:.6f}".format(losses[-1]))
+        print("Testing loss"+str(losses[-1]))
         plot_fig_test(outputs,labels)
 
 def plot_fig(training_losses):
@@ -183,4 +183,5 @@ if __name__ == '__main__':
     sequence_length = 6
     batch_size = 5
     lr = 0.002
-    main(path, profile_id, target_list, feature_list,sequence_length,batch_size,lr,test=True) # if cross test, profile used for test
+    output=['pm']
+    main(path, profile_id, target_list, feature_list, output, sequence_length,batch_size,lr,test=True) # if cross test, profile used for test
