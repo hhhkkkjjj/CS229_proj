@@ -5,6 +5,7 @@ Final project for 2019 Fall CS 229 Machine Learning
 pip install pandas
 pip install scikit-learn
 pip install seaborn
+pip install pytorch
 ```
 Download dataset via https://www.kaggle.com/wkirgsn/electric-motor-temperature and put it in src folder.
 
