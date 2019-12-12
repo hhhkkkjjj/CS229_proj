@@ -38,15 +38,16 @@ class Network(nn.Module):
         self.conv1 = nn.Conv1d(1, 5, kernel_size=(sequence_length, n_features))
 
         self.lin_in_size = self.conv1.out_channels * int(((sequence_length - (self.conv1.kernel_size[0]-1) -1)/self.conv1.stride[0] +1))
-
+        self.fc0 = nn.Dropout(0.1)
         self.fc1 = nn.Linear(self.lin_in_size,300)
         self.fc2 = nn.Linear(300, 1)
 
+
     def forward(self, x):
+        x = self.fc0(self.conv1(x))
+        x= F.relu(x)
 
-        x = F.relu(self.conv1(x))
         x = x.view(-1, self.lin_in_size)
-
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
 
@@ -139,7 +140,8 @@ def main(path, prof_id, target_list, feature_list,output, sequence_length,batch_
         if delta<threshold:
             break
         prev_loss=training_losses[-1]
-        print("Epoch {}, loss {:.6f}".format(epoch+1, training_losses[-1]))
+        print("Epoch "+str(epoch+1))
+        print("loss "+str( training_losses[-1]))
     plot_fig(training_losses)
 
  ## testing
